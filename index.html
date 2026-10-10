@@ -6,6 +6,8 @@
 <title>Stock Control Pro</title>
 <meta name="theme-color" content="#f5f6f8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- SheetJS for Excel Export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 :root {
@@ -27,19 +29,12 @@ input, select, textarea { width: 100%; background: var(--card); color: var(--tex
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
-/* SPLASH */
-.splash-screen { position: fixed; inset: 0; background: var(--navy); z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; transition: opacity 0.5s, visibility 0.5s; }
-.splash-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-.splash-logo { width: 80px; height: 80px; background: var(--accent); border-radius: 24px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin-bottom: 16px; box-shadow: 0 10px 25px rgba(45,92,255,0.4); }
-.splash-title { font-size: 1.5rem; font-weight: 800; letter-spacing: 0.5px; }
-.splash-loader { margin-top: 24px; width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.15); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* GLOBAL LOADING OVERLAY */
 .global-loader { position: fixed; inset: 0; background: rgba(245,246,248,0.75); backdrop-filter: blur(3px); z-index: 800; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
 .global-loader.show { display: flex; }
 .global-loader .circle { width: 48px; height: 48px; border: 4px solid rgba(45,92,255,0.15); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 .global-loader .text { font-size: 0.8rem; color: var(--text-sub); font-weight: 600; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* SHIMMER */
 .shimmer-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; display: flex; gap: 14px; align-items: center; overflow: hidden; }
@@ -77,25 +72,26 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .user-badge { background: var(--accent-soft); color: var(--accent); padding: 5px 12px; border-radius: 30px; font-size: 0.7rem; font-weight: 700; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn-logout { color: var(--text-sub); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600; background: var(--card); }
 
-/* SEARCH */
+/* SEARCH & EXCEL ROW */
 .search-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
 .search-box { position: relative; flex: 1; }
 .search-box input { padding-left: 42px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-pill); padding-top: 13px; padding-bottom: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
 .search-box i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; }
+.btn-excel { width: 46px; height: 46px; border-radius: 50%; background: var(--green); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34,197,94,0.3); }
 .btn-add { width: 46px; height: 46px; border-radius: 50%; background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(26,34,51,0.25); }
 
 /* PAGE */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 0 4px; }
 .section-header .count { font-size: 0.85rem; font-weight: 700; color: var(--text); }
-.section-header .sort { font-size: 0.75rem; color: var(--text-sub); display: flex; align-items: center; gap: 5px; }
 .page { display: none; }
 .page.active { display: block; }
 
-/* STATS */
-.stats-grid { display: flex; gap: 12px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
-.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; min-width: 130px; flex: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
-.stat-card .label { font-size: 0.68rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px; }
-.stat-card .value { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+/* STATS - FIX GRID (NO SCROLL) */
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 10px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02); cursor: pointer; transition: transform 0.1s; }
+.stat-card:active { transform: scale(0.98); }
+.stat-card .label { font-size: 0.62rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 700; margin-bottom: 6px; }
+.stat-card .value { font-size: 1.25rem; font-weight: 800; line-height: 1; }
 
 /* LIST ITEMS */
 .list-container { display: flex; flex-direction: column; gap: 10px; }
@@ -103,7 +99,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .item-img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--card-alt); border: 1px solid var(--border); flex-shrink: 0; cursor: pointer; }
 .item-img-placeholder { width: 56px; height: 56px; border-radius: 12px; background: var(--card-alt); border: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 1.3rem; }
 .item-details { flex: 1; min-width: 0; }
-.item-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+.item-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
 .item-subtext { font-size: 0.78rem; color: var(--text-sub); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .item-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .tag { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
@@ -111,6 +107,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .tag-green { background: var(--green-soft); color: var(--green); }
 .tag-yellow { background: var(--yellow-soft); color: var(--yellow); }
 .tag-red { background: var(--red-soft); color: var(--red); }
+
+/* STOCK ACTION BTN */
+.stock-action-btns { display: flex; gap: 6px; }
+.btn-quick-action { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; border: none; cursor: pointer; }
+.btn-quick-in { background: var(--green-soft); color: var(--green); }
+.btn-quick-out { background: var(--red-soft); color: var(--red); }
 
 .item-actions { display: flex; gap: 8px; margin-top: 10px; }
 .btn-confirm, .btn-reject, .btn-delete { flex: 1; border-radius: var(--radius-sm); padding: 9px; font-size: 0.75rem; font-weight: 700; border: none; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -134,6 +136,11 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .btn-submit { width: 100%; border: none; border-radius: var(--radius-md); padding: 16px; font-weight: 700; font-size: 0.95rem; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .btn-submit.btn-in { background: var(--navy); color: #fff; box-shadow: 0 4px 12px rgba(26,34,51,0.2); }
 
+/* FILTER CHIPS */
+.filter-row { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
+.filter-chip { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; background: var(--card); border: 1px solid var(--border); color: var(--text-sub); cursor: pointer; flex-shrink: 0; }
+.filter-chip.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
 /* MODAL */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 24px; }
 .modal-box { background: var(--card); border-radius: var(--radius-lg); width: 100%; max-width: 440px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
@@ -150,11 +157,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* BOTTOM NAV */
 .bottom-nav-wrap { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; max-width: 580px; margin: 0 auto; padding: 0 16px 16px; pointer-events: none; }
-.bottom-nav { background: var(--navy); border-radius: var(--radius-pill); display: flex; justify-content: space-around; align-items: center; height: 62px; padding: 0 8px; box-shadow: 0 8px 24px rgba(26,34,51,0.3); pointer-events: auto; }
-.nav-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; color: rgba(255,255,255,0.5); font-size: 0.6rem; cursor: pointer; padding: 8px 12px; border-radius: 30px; transition: all 0.2s; font-weight: 600; }
-.nav-item i { font-size: 1.05rem; }
+.bottom-nav { background: var(--navy); border-radius: var(--radius-pill); display: flex; justify-content: space-around; align-items: center; height: 62px; padding: 0 6px; box-shadow: 0 8px 24px rgba(26,34,51,0.3); pointer-events: auto; }
+.nav-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; color: rgba(255,255,255,0.5); font-size: 0.58rem; cursor: pointer; padding: 8px 8px; border-radius: 30px; transition: all 0.2s; font-weight: 600; }
+.nav-item i { font-size: 1rem; }
 .nav-item.active { color: #fff; background: rgba(255,255,255,0.12); }
-.nav-badge { position: absolute; top: 4px; right: 10px; background: var(--yellow); color: var(--navy); font-size: 0.65rem; font-weight: 800; border-radius: 10px; padding: 1px 5px; min-width: 16px; text-align: center; border: 2px solid var(--navy); line-height: 1; display: none; }
+.nav-badge { position: absolute; top: 4px; right: 6px; background: var(--yellow); color: var(--navy); font-size: 0.6rem; font-weight: 800; border-radius: 10px; padding: 1px 4px; min-width: 14px; text-align: center; border: 2px solid var(--navy); line-height: 1; display: none; }
+.nav-badge-red { background: var(--red); color: #fff; }
 
 /* TOAST & EMPTY */
 .toast { position: fixed; left: 50%; bottom: 110px; transform: translateX(-50%) translateY(120px); background: var(--navy); color: #fff; padding: 12px 22px; border-radius: var(--radius-pill); z-index: 999; opacity: 0; transition: all 0.3s; font-size: 0.82rem; box-shadow: 0 8px 24px rgba(0,0,0,0.2); max-width: 90%; text-align: center; }
@@ -174,13 +182,6 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 </style>
 </head>
 <body>
-
-<!-- SPLASH -->
-<div class="splash-screen" id="splashScreen">
-  <div class="splash-logo"><i class="fa-solid fa-cube"></i></div>
-  <div class="splash-title">Stock Control Pro</div>
-  <div class="splash-loader"></div>
-</div>
 
 <!-- GLOBAL LOADER -->
 <div class="global-loader" id="globalLoader">
@@ -235,8 +236,9 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   <div class="search-row">
     <div class="search-box">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" id="searchInput" placeholder="Search products..." oninput="renderData()">
+      <input type="text" id="searchInput" placeholder="Search products..." oninput="debounceRender()">
     </div>
+    <button class="btn-excel" onclick="exportToExcel()" title="Excel သို့ ထုတ်မည်"><i class="fa-solid fa-file-excel"></i></button>
     <button class="btn-add" onclick="switchPage('page-action', document.getElementById('navActionBtn'))"><i class="fa-solid fa-plus"></i></button>
   </div>
 
@@ -245,8 +247,11 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
     <div class="section-header"><span class="count"><i class="fa-solid fa-chart-line"></i> Stock Overview</span></div>
     <div class="stats-grid">
       <div class="stat-card"><div class="label">In Stock</div><div class="value" id="totalIn" style="color:var(--green)">0</div></div>
-      <div class="stat-card"><div class="label">Sold Out</div><div class="value" id="totalOut" style="color:var(--red)">0</div></div>
-      <div class="stat-card"><div class="label">Pending</div><div class="value" id="totalPending" style="color:var(--yellow)">0</div></div>
+      <div class="stat-card"><div class="label">Today In</div><div class="value" id="todayIn" style="color:var(--accent)">0</div></div>
+      <div class="stat-card"><div class="label">Today Out</div><div class="value" id="todayOut" style="color:var(--yellow)">0</div></div>
+      <div class="stat-card" onclick="switchPage('page-outofstock', document.querySelectorAll('.nav-item')[2])"><div class="label">All Out</div><div class="value" id="totalOutOfStock" style="color:var(--red)">0</div></div>
+      <div class="stat-card"><div class="label">Total Out</div><div class="value" id="totalOut" style="color:var(--red)">0</div></div>
+      <div class="stat-card" onclick="switchPage('page-pending', document.querySelectorAll('.nav-item')[4])"><div class="label">Pending</div><div class="value" id="totalPending" style="color:var(--yellow)">0</div></div>
     </div>
     <div class="section-header"><span class="count"><i class="fa-solid fa-boxes-stacked"></i> Products</span></div>
     <div class="list-container" id="inventoryContainer"></div>
@@ -256,6 +261,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   <div class="page" id="page-inventory">
     <div class="section-header"><span class="count"><i class="fa-solid fa-boxes-stacked"></i> လက်ရှိ ပစ္စည်းလက်ကျန်</span></div>
     <div class="list-container" id="inventoryContainer2"></div>
+  </div>
+
+  <!-- OUT OF STOCK PAGE -->
+  <div class="page" id="page-outofstock">
+    <div class="section-header"><span class="count"><i class="fa-solid fa-triangle-exclamation" style="color:var(--red)"></i> ကုန်သွားသော ပစ္စည်းများ (Out of Stock)</span></div>
+    <div class="list-container" id="outOfStockContainer"></div>
   </div>
 
   <!-- FORM -->
@@ -314,6 +325,14 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   <!-- HISTORY -->
   <div class="page" id="page-history">
     <div class="section-header"><span class="count"><i class="fa-solid fa-clock-rotate-left"></i> History Log</span></div>
+    
+    <!-- IN / OUT Filter Chips -->
+    <div class="filter-row">
+      <div class="filter-chip active" onclick="setHistoryFilter('ALL', this)">အားလုံး</div>
+      <div class="filter-chip" onclick="setHistoryFilter('IN', this)">Stock IN (အဝင်)</div>
+      <div class="filter-chip" onclick="setHistoryFilter('OUT', this)">Stock OUT (အထွက်)</div>
+    </div>
+
     <div class="list-container" id="historyContainer"></div>
   </div>
 
@@ -322,6 +341,10 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
     <nav class="bottom-nav">
       <button class="nav-item active" onclick="switchPage('page-dashboard', this)"><i class="fa-solid fa-chart-pie"></i><span>Dashboard</span></button>
       <button class="nav-item" onclick="switchPage('page-inventory', this)"><i class="fa-solid fa-boxes-stacked"></i><span>Stock</span></button>
+      <button class="nav-item" onclick="switchPage('page-outofstock', this)">
+        <i class="fa-solid fa-triangle-exclamation"></i><span>Out of Stock</span>
+        <span class="nav-badge nav-badge-red" id="outOfStockBadge">0</span>
+      </button>
       <button class="nav-item" id="navActionBtn" onclick="switchPage('page-action', this)"><i class="fa-solid fa-plus-circle"></i><span id="navActionText">ပစ္စည်းသွင်း</span></button>
       <button class="nav-item" onclick="switchPage('page-pending', this)">
         <i class="fa-solid fa-hourglass-half"></i><span>Pending</span>
@@ -340,6 +363,32 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
       <button style="background:none; color:var(--text-sub); font-size:1.2rem;" onclick="closeSelectModal()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body" id="modalItemList"></div>
+  </div>
+</div>
+
+<!-- QUICK IN/OUT MODAL -->
+<div class="modal-overlay" id="quickActionModal">
+  <div class="modal-box" style="max-width: 360px;">
+    <div class="modal-header">
+      <span style="font-weight:700; font-size:0.95rem;" id="quickModalTitle">Stock In/Out</span>
+      <button style="background:none; color:var(--text-sub); font-size:1.2rem;" onclick="closeQuickModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="quickActionForm" onsubmit="submitQuickAction(event)">
+        <input type="hidden" id="quickItemName">
+        <input type="hidden" id="quickItemType">
+        <input type="hidden" id="quickItemImage">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label><i class="fa-solid fa-layer-group"></i> အရေအတွက် (ခုရေ)</label>
+          <input type="number" id="quickQty" min="1" placeholder="အရေအတွက် ဖြည့်ပါ" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label><i class="fa-regular fa-note-sticky"></i> မှတ်ချက်</label>
+          <input type="text" id="quickNote" placeholder="မှတ်ချက် ဖြည့်ရန်">
+        </div>
+        <button type="submit" class="btn-submit btn-in" id="quickSubmitBtn">အတည်ပြုမည်</button>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -381,6 +430,9 @@ let currentUser = null;
 let userRole = "CLIENT";
 let stockBalanceMap = {};
 let pendingDeleteId = null;
+let currentHistoryFilter = "ALL";
+let currentActivePage = "page-dashboard";
+let searchTimeout = null;
 window.stockData = [];
 window.selectedExistingImageUrl = null;
 
@@ -426,11 +478,12 @@ function showToast(msg) {
 }
 
 function switchPage(pageId, navElement) {
+  currentActivePage = pageId;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
   if (navElement) navElement.classList.add('active');
-  if (pageId === 'page-inventory') renderData();
+  renderData();
 }
 
 function toggleAuthMode(isSignup) {
@@ -439,8 +492,6 @@ function toggleAuthMode(isSignup) {
   document.getElementById("authTitle").textContent = isSignup ? "Client အကောင့်ဖွင့်မည်" : "Stock Control Pro";
   document.getElementById("authSubTitle").textContent = isSignup ? "Client အနေနဲ့သာ ဖွင့်နိုင်ပါသည်" : "အကောင့်သို့ ဝင်ရောက်ပါ";
 }
-
-function hideSplashScreen() { document.getElementById("splashScreen").classList.add("hidden"); }
 
 /* SHIMMER */
 function renderShimmer() {
@@ -459,8 +510,46 @@ function renderShimmer() {
   `).join('');
   document.getElementById("inventoryContainer").innerHTML = shimmerHTML;
   document.getElementById("inventoryContainer2").innerHTML = shimmerHTML;
+  document.getElementById("outOfStockContainer").innerHTML = shimmerHTML;
   document.getElementById("pendingContainer").innerHTML = shimmerHTML;
   document.getElementById("historyContainer").innerHTML = shimmerHTML;
+}
+
+/* EXCEL EXPORT FUNCTION */
+function exportToExcel() {
+  const data = window.stockData || [];
+  if (data.length === 0) {
+    showToast("ထုတ်ယူရန် ဒေတာ မရှိသေးပါ");
+    return;
+  }
+
+  showGlobalLoader("Excel ဖိုင် ထုတ်နေသည်...");
+
+  // Confirmed History Data များကို Excel အတွက် ပြင်ဆင်ခြင်း
+  const excelRows = data.filter(r => r.status === "CONFIRMED").map((row, index) => ({
+    "စဉ်": index + 1,
+    "ပစ္စည်းအမည်": row.item_name,
+    "အမျိုးအစား": row.type === "IN" ? "Stock IN (အဝင်)" : "Stock OUT (အထွက်)",
+    "အရေအတွက် (ခု)": row.qty,
+    "မှတ်ချက်": row.note || "-",
+    "ပြုလုပ်သူ": row.created_by_email ? row.created_by_email.split('@')[0] : "Unknown",
+    "ရက်စွဲ": formatDate(row.created_at)
+  }));
+
+  if (excelRows.length === 0) {
+    hideGlobalLoader();
+    showToast("ထုတ်ယူရန် Confirmed မှတ်တမ်း မရှိသေးပါ။");
+    return;
+  }
+
+  const worksheet = XLSX.utils.json_to_sheet(excelRows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Stock History");
+
+  // Excel ဖိုင် ဒေါင်းလုဒ်လုပ်ခြင်း
+  XLSX.writeFile(workbook, `Stock_Control_Report_${Date.now()}.xlsx`);
+  hideGlobalLoader();
+  showToast("Excel ဖိုင် ထုတ်ယူခြင်း အောင်မြင်ပါသည်");
 }
 
 /* UPDATE STATUS (Admin) */
@@ -595,7 +684,6 @@ async function checkUserSession() {
     document.getElementById("appContent").style.display = "none";
     document.getElementById("loginScreen").style.display = "flex";
   }
-  hideSplashScreen();
 }
 
 /* FETCH */
@@ -612,11 +700,18 @@ function buildProductCard(name, item) {
   const imgTag = item.image_url
     ? `<img src="${img}" class="item-img" onclick="openImagePreview('${img}')"><div class="item-img-placeholder" style="display:none"><i class="fa-solid fa-cube"></i></div>`
     : `<div class="item-img-placeholder"><i class="fa-solid fa-cube"></i></div>`;
+  
   return `
     <div class="item-card">
       ${imgTag}
       <div class="item-details">
-        <div class="item-title">${name}</div>
+        <div class="item-title">
+          <span>${name}</span>
+          <div class="stock-action-btns">
+            <button class="btn-quick-action btn-quick-in" onclick="openQuickModal('${name}', 'IN', '${item.image_url || ''}')" title="Stock In"><i class="fa-solid fa-plus"></i></button>
+            <button class="btn-quick-action btn-quick-out" onclick="openQuickModal('${name}', 'OUT', '${item.image_url || ''}')" title="Stock Out"><i class="fa-solid fa-minus"></i></button>
+          </div>
+        </div>
         <div class="item-subtext">လက်ကျန်: ${item.balance} ခု</div>
         <div class="item-tags">
           <span class="tag tag-blue"><i class="fa-solid fa-arrow-down"></i> ${item.in} IN</span>
@@ -627,33 +722,59 @@ function buildProductCard(name, item) {
     </div>`;
 }
 
+function setHistoryFilter(type, el) {
+  currentHistoryFilter = type;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderData();
+}
+
+/* SEARCH DEBOUNCE */
+function debounceRender() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    renderData();
+  }, 250);
+}
+
 function renderData() {
   const data = window.stockData || [];
   const searchQuery = document.getElementById("searchInput").value.toLowerCase().trim();
-  const pendingContainer = document.getElementById("pendingContainer");
-  const historyContainer = document.getElementById("historyContainer");
-  const inventoryContainer = document.getElementById("inventoryContainer");
-  const inventoryContainer2 = document.getElementById("inventoryContainer2");
-  pendingContainer.innerHTML = ""; historyContainer.innerHTML = "";
-  inventoryContainer.innerHTML = ""; inventoryContainer2.innerHTML = "";
-
+  
   let totalIn = 0, totalOut = 0, totalPending = 0;
-  let pendingCount = 0, historyCount = 0;
+  let todayIn = 0, todayOut = 0;
+  let pendingCount = 0, historyCount = 0, outOfStockCount = 0;
   stockBalanceMap = {};
+
+  const todayStr = new Date().toDateString();
+
+  const pendingListHTML = [];
+  const historyListHTML = [];
 
   data.forEach(row => {
     const itemName = row.item_name.trim();
     const imgUrl = (row.image_url && row.image_url.length > 5) ? row.image_url : DEFAULT_SVG;
+    
     if (row.status === "PENDING") totalPending++;
     if (row.status === "CONFIRMED") {
-      if (row.type === "IN") totalIn += Number(row.qty);
-      if (row.type === "OUT") totalOut += Number(row.qty);
+      const isToday = new Date(row.created_at).toDateString() === todayStr;
+
+      if (row.type === "IN") {
+        totalIn += Number(row.qty);
+        if (isToday) todayIn += Number(row.qty);
+      }
+      if (row.type === "OUT") {
+        totalOut += Number(row.qty);
+        if (isToday) todayOut += Number(row.qty);
+      }
+
       if (!stockBalanceMap[itemName]) stockBalanceMap[itemName] = { in: 0, out: 0, balance: 0, image_url: imgUrl };
       if (row.image_url && row.image_url.length > 5) stockBalanceMap[itemName].image_url = row.image_url;
       if (row.type === "IN") stockBalanceMap[itemName].in += Number(row.qty);
       if (row.type === "OUT") stockBalanceMap[itemName].out += Number(row.qty);
       stockBalanceMap[itemName].balance = stockBalanceMap[itemName].in - stockBalanceMap[itemName].out;
     }
+
     if (searchQuery && !itemName.toLowerCase().includes(searchQuery)) return;
 
     if (row.status === "PENDING") {
@@ -671,33 +792,36 @@ function renderData() {
             <button class="btn-delete" onclick="window.openDeleteModal(${row.id})"><i class="fa-solid fa-trash-can"></i> ဖျက်မည်</button>
           </div>`;
       }
-      pendingContainer.innerHTML += `
+      pendingListHTML.push(`
         <div class="item-card">
           ${row.image_url ? `<img src="${imgUrl}" class="item-img" onclick="openImagePreview('${imgUrl}')">` : `<div class="item-img-placeholder"><i class="fa-solid fa-cube"></i></div>`}
           <div class="item-details">
-            <div class="item-title">${row.item_name}</div>
+            <div class="item-title"><span>${row.item_name}</span></div>
             <div class="item-subtext">
               <span><i class="fa-solid fa-layer-group"></i> ${row.qty} ခု</span>
               <span><i class="fa-solid fa-user"></i> ${row.created_by_email || 'Unknown'}</span>
             </div>
+            ${row.note ? `<div class="item-subtext"><i class="fa-regular fa-note-sticky"></i> ${row.note}</div>` : ''}
             <div class="item-tags">
               <span class="tag tag-yellow"><i class="fa-solid fa-clock"></i> Pending</span>
               <span class="tag tag-blue">${row.type}</span>
             </div>
             ${actionButtons}
           </div>
-        </div>`;
+        </div>`);
     } else if (row.status === "CONFIRMED") {
+      if (currentHistoryFilter !== "ALL" && row.type !== currentHistoryFilter) return;
       historyCount++;
-      historyContainer.innerHTML += `
+      historyListHTML.push(`
         <div class="item-card">
           ${row.image_url ? `<img src="${imgUrl}" class="item-img" onclick="openImagePreview('${imgUrl}')">` : `<div class="item-img-placeholder"><i class="fa-solid fa-cube"></i></div>`}
           <div class="item-details">
-            <div class="item-title">${row.item_name}</div>
+            <div class="item-title"><span>${row.item_name}</span></div>
             <div class="item-subtext">
               <span><i class="fa-solid fa-layer-group"></i> ${row.qty} ခု</span>
               <span><i class="fa-solid fa-user"></i> ${row.created_by_email ? row.created_by_email.split('@')[0] : 'Unknown'}</span>
             </div>
+            ${row.note ? `<div class="item-subtext" style="color:var(--text); font-weight:500;"><i class="fa-regular fa-note-sticky"></i> ${row.note}</div>` : ''}
             <div class="item-subtext" style="color:var(--accent); font-weight:600;">
               <i class="fa-regular fa-calendar-check"></i> ${formatDate(row.created_at)}
             </div>
@@ -706,33 +830,56 @@ function renderData() {
               <span class="tag tag-green"><i class="fa-solid fa-check"></i> Confirmed</span>
             </div>
           </div>
-        </div>`;
+        </div>`);
     }
   });
 
   const itemNames = Object.keys(stockBalanceMap);
   let stockCount = 0;
   let itemsHTML = "";
+  let outOfStockHTML = "";
+
   itemNames.forEach(name => {
     if (searchQuery && !name.toLowerCase().includes(searchQuery)) return;
     stockCount++;
-    itemsHTML += buildProductCard(name, stockBalanceMap[name]);
+    const prodHTML = buildProductCard(name, stockBalanceMap[name]);
+    itemsHTML += prodHTML;
+
+    if (stockBalanceMap[name].balance <= 0) {
+      outOfStockCount++;
+      outOfStockHTML += prodHTML;
+    }
   });
 
-  if (stockCount === 0) {
+  if (currentActivePage === 'page-dashboard' || currentActivePage === 'page-inventory') {
     const emptyHTML = `<div class="empty-state"><i class="fa-solid fa-box-open"></i><span>ပစ္စည်းစာရင်း မရှိသေးပါ။</span></div>`;
-    inventoryContainer.innerHTML = emptyHTML;
-    inventoryContainer2.innerHTML = emptyHTML;
-  } else {
-    inventoryContainer.innerHTML = itemsHTML;
-    inventoryContainer2.innerHTML = itemsHTML;
+    document.getElementById("inventoryContainer").innerHTML = stockCount === 0 ? emptyHTML : itemsHTML;
+    document.getElementById("inventoryContainer2").innerHTML = stockCount === 0 ? emptyHTML : itemsHTML;
   }
-  if (pendingCount === 0) pendingContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-clock-rotate-left"></i><span>Pending စာရင်း မရှိသေးပါ။</span></div>`;
-  if (historyCount === 0) historyContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-receipt"></i><span>မှတ်တမ်း မရှိသေးပါ။</span></div>`;
+  
+  if (currentActivePage === 'page-outofstock') {
+    document.getElementById("outOfStockContainer").innerHTML = outOfStockCount === 0 
+      ? `<div class="empty-state"><i class="fa-solid fa-circle-check" style="color:var(--green)"></i><span>ကုန်သွားသော ပစ္စည်း မရှိပါ။ လက်ကျန် အားလုံး ကောင်းမွန်ပါသည်။</span></div>` 
+      : outOfStockHTML;
+  }
 
-  // Dashboard Stats 計算 (Total In မှ Total Out ကို နှုတ်၍ လက်ရှိ In-Stock Balance ကို တွက်ထုတ်ခြင်း)
+  if (currentActivePage === 'page-pending') {
+    document.getElementById("pendingContainer").innerHTML = pendingCount === 0 
+      ? `<div class="empty-state"><i class="fa-solid fa-clock-rotate-left"></i><span>Pending စာရင်း မရှိသေးပါ။</span></div>` 
+      : pendingListHTML.join('');
+  }
+
+  if (currentActivePage === 'page-history') {
+    document.getElementById("historyContainer").innerHTML = historyCount === 0 
+      ? `<div class="empty-state"><i class="fa-solid fa-receipt"></i><span>မှတ်တမ်း မရှိသေးပါ။</span></div>` 
+      : historyListHTML.join('');
+  }
+
   const currentInStockBalance = totalIn - totalOut;
   document.getElementById("totalIn").textContent = currentInStockBalance > 0 ? currentInStockBalance : 0;
+  document.getElementById("todayIn").textContent = todayIn;
+  document.getElementById("todayOut").textContent = todayOut;
+  document.getElementById("totalOutOfStock").textContent = outOfStockCount;
   document.getElementById("totalOut").textContent = totalOut;
   document.getElementById("totalPending").textContent = totalPending;
 
@@ -741,6 +888,73 @@ function renderData() {
     badgeEl.textContent = totalPending > 99 ? '99+' : totalPending;
     badgeEl.style.display = "block";
   } else badgeEl.style.display = "none";
+
+  const outOfStockBadgeEl = document.getElementById("outOfStockBadge");
+  if (outOfStockCount > 0) {
+    outOfStockBadgeEl.textContent = outOfStockCount > 99 ? '99+' : outOfStockCount;
+    outOfStockBadgeEl.style.display = "block";
+  } else outOfStockBadgeEl.style.display = "none";
+}
+
+/* QUICK IN/OUT MODAL FUNCTIONS */
+function openQuickModal(name, type, imageUrl) {
+  document.getElementById("quickItemName").value = name;
+  document.getElementById("quickItemType").value = type;
+  document.getElementById("quickItemImage").value = imageUrl;
+  document.getElementById("quickQty").value = "";
+  document.getElementById("quickNote").value = "";
+  
+  const titleEl = document.getElementById("quickModalTitle");
+  const submitBtn = document.getElementById("quickSubmitBtn");
+  if (type === "IN") {
+    titleEl.textContent = `Stock IN: ${name}`;
+    submitBtn.className = "btn-submit btn-in";
+    submitBtn.style.background = "var(--green)";
+  } else {
+    titleEl.textContent = `Stock OUT: ${name}`;
+    submitBtn.className = "btn-submit btn-in";
+    submitBtn.style.background = "var(--red)";
+  }
+  document.getElementById("quickActionModal").style.display = "flex";
+}
+
+function closeQuickModal() {
+  document.getElementById("quickActionModal").style.display = "none";
+}
+
+async function submitQuickAction(e) {
+  e.preventDefault();
+  const itemName = document.getElementById("quickItemName").value;
+  const type = document.getElementById("quickItemType").value;
+  const imageUrl = document.getElementById("quickItemImage").value;
+  const qty = Number(document.getElementById("quickQty").value);
+  const note = document.getElementById("quickNote").value.trim();
+
+  closeQuickModal();
+  showGlobalLoader("စာရင်းသွင်းနေသည်...");
+
+  try {
+    const status = (userRole === "CLIENT") ? "PENDING" : "CONFIRMED";
+    const { error } = await db.from("stock_requests").insert({
+      sender_name: "Store",
+      item_name: itemName,
+      type: type,
+      qty: qty,
+      note: note,
+      status: status,
+      image_url: imageUrl || null,
+      created_by_email: currentUser ? currentUser.email : null
+    });
+
+    if (error) throw error;
+
+    hideGlobalLoader();
+    showToast("အောင်မြင်စွာ ဆောင်ရွက်ပြီးပါပြီ");
+    fetchData();
+  } catch (err) {
+    hideGlobalLoader();
+    showToast("မအောင်မြင်ပါ: " + err.message);
+  }
 }
 
 /* SELECT MODAL */
@@ -811,7 +1025,7 @@ document.getElementById("requestForm").addEventListener("submit", async (e) => {
 
     fetchData();
 
-    switchPage(userRole === "CLIENT" ? 'page-pending' : 'page-history', document.querySelectorAll('.nav-item')[userRole === "CLIENT" ? 3 : 4]);
+    switchPage(userRole === "CLIENT" ? 'page-pending' : 'page-history', document.querySelectorAll('.nav-item')[5]);
 
   } catch (err) {
     hideGlobalLoader();
@@ -825,7 +1039,7 @@ document.getElementById("requestForm").addEventListener("submit", async (e) => {
 });
 
 window.addEventListener("DOMContentLoaded", () => {
-  setTimeout(() => { checkUserSession(); }, 1000);
+  checkUserSession();
 });
 </script>
 </body>
