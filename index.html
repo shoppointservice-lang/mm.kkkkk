@@ -269,7 +269,16 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
         </div>
       </div>
       <form id="requestForm">
-        <input type="hidden" id="type" value="IN">
+        <!-- Type Selector (Admin တွေအတွက်သာ ပေါ်မည်) -->
+        <div class="form-group" id="typeSelectorGroup" style="display: none;">
+          <label><i class="fa-solid fa-arrow-right-arrow-left"></i> Transaction အမျိုးအစား</label>
+          <select id="typeSelect">
+            <option value="IN">Stock IN (အဝင်)</option>
+            <option value="OUT">Stock OUT (အထွက်)</option>
+          </select>
+        </div>
+        <input type="hidden" id="typeHidden" value="IN">
+
         <div class="form-group">
           <label><i class="fa-solid fa-box"></i> ပစ္စည်း အမည်</label>
           <input type="text" id="itemName" placeholder="ဥပမာ - T-Shirt Blue (Size M)" required>
@@ -277,7 +286,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
         </div>
         <div class="form-group">
           <label><i class="fa-solid fa-layer-group"></i> အရေအတွက် (ခုရေ)</label>
-          <input type="number" id="qty" min="1" placeholder="သွင်းလိုသော အရေအတွက်" required>
+          <input type="number" id="qty" min="1" placeholder="အရေအတွက် ဖြည့်ပါ" required>
         </div>
         <div class="form-group">
           <label><i class="fa-solid fa-camera"></i> ပစ္စည်း ဓာတ်ပုံ</label>
@@ -521,7 +530,7 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = document.getElementById("signupEmail").value.trim();
   const password = document.getElementById("signupPassword").value;
-  const role = "CLIENT"; // Fixed: only client accounts
+  const role = "CLIENT";
   const btn = document.getElementById("signupBtn");
   btn.disabled = true;
   btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ဖွင့်နေသည်...`;
@@ -562,8 +571,24 @@ async function checkUserSession() {
     document.getElementById("appContent").style.display = "block";
 
     const clientNotice = document.getElementById("clientNotice");
-    if (userRole === "CLIENT") { clientNotice.style.display = "flex"; }
-    else { clientNotice.style.display = "none"; }
+    const typeSelectorGroup = document.getElementById("typeSelectorGroup");
+    const formHeaderTitle = document.getElementById("formHeaderTitle");
+    const formHeaderSub = document.getElementById("formHeaderSub");
+    const submitBtn = document.getElementById("submitBtn");
+
+    if (userRole === "CLIENT") {
+      clientNotice.style.display = "flex";
+      typeSelectorGroup.style.display = "none";
+      formHeaderTitle.textContent = "Warehouse သို့ ပစ္စည်းသွင်းမည်";
+      formHeaderSub.textContent = "အဝင်ပစ္စည်း အချက်အလက်များ တိကျစွာ ဖြည့်သွင်းပါ";
+      submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Warehouse သို့ ပေးပို့မည်`;
+    } else {
+      clientNotice.style.display = "none";
+      typeSelectorGroup.style.display = "block";
+      formHeaderTitle.textContent = "Stock စာရင်း သွင်း/ထုတ် မည်";
+      formHeaderSub.textContent = "အဝင်/အထွက် ပစ္စည်း စာရင်း တိုက်ရိုက် ရေးသွင်းပါ";
+      submitBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> စာရင်း တိုက်ရိုက် သွင်းမည်`;
+    }
 
     await fetchData();
   } else {
@@ -705,9 +730,12 @@ function renderData() {
   if (pendingCount === 0) pendingContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-clock-rotate-left"></i><span>Pending စာရင်း မရှိသေးပါ။</span></div>`;
   if (historyCount === 0) historyContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-receipt"></i><span>မှတ်တမ်း မရှိသေးပါ။</span></div>`;
 
-  document.getElementById("totalIn").textContent = totalIn;
+  // Dashboard Stats 計算 (Total In မှ Total Out ကို နှုတ်၍ လက်ရှိ In-Stock Balance ကို တွက်ထုတ်ခြင်း)
+  const currentInStockBalance = totalIn - totalOut;
+  document.getElementById("totalIn").textContent = currentInStockBalance > 0 ? currentInStockBalance : 0;
   document.getElementById("totalOut").textContent = totalOut;
   document.getElementById("totalPending").textContent = totalPending;
+
   const badgeEl = document.getElementById("pendingBadge");
   if (totalPending > 0) {
     badgeEl.textContent = totalPending > 99 ? '99+' : totalPending;
@@ -742,36 +770,57 @@ document.getElementById("requestForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("submitBtn");
   const item_name = document.getElementById("itemName").value.trim();
-  const type = document.getElementById("type").value;
+  
+  const type = (userRole === "CLIENT") 
+    ? document.getElementById("typeHidden").value 
+    : document.getElementById("typeSelect").value;
+
   const qty = Number(document.getElementById("qty").value);
   const note = document.getElementById("note").value.trim();
   const fileInput = document.getElementById("itemImage");
+
   btn.disabled = true;
   btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> စာရင်းသွင်းနေသည်...`;
   showGlobalLoader("စာရင်းသွင်းနေသည်...");
+
   let finalImageUrl = window.selectedExistingImageUrl || null;
   try {
     if (fileInput.files.length > 0) finalImageUrl = await uploadToImageKit(fileInput.files[0]);
+    
     const status = (userRole === "CLIENT") ? "PENDING" : "CONFIRMED";
+
     const { error } = await db.from("stock_requests").insert({
-      sender_name: "Store", item_name, type, qty, note, status,
-      image_url: finalImageUrl, created_by_email: currentUser ? currentUser.email : null
+      sender_name: "Store", 
+      item_name, 
+      type, 
+      qty, 
+      note, 
+      status,
+      image_url: finalImageUrl, 
+      created_by_email: currentUser ? currentUser.email : null
     });
+
     if (error) throw error;
+
     hideGlobalLoader();
     showToast("အောင်မြင်စွာ ပေးပို့ပြီးပါပြီ");
     document.getElementById("requestForm").reset();
     document.getElementById("fileNamePreview").textContent = "ဓာတ်ပုံ တင်ရန် နှိပ်ပါ";
     document.getElementById("fileNamePreview").style.color = "var(--text-sub)";
     window.selectedExistingImageUrl = null;
+
     fetchData();
+
     switchPage(userRole === "CLIENT" ? 'page-pending' : 'page-history', document.querySelectorAll('.nav-item')[userRole === "CLIENT" ? 3 : 4]);
+
   } catch (err) {
     hideGlobalLoader();
     showToast("မအောင်မြင်ပါ: " + err.message);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = (userRole === "CLIENT") ? `<i class="fa-solid fa-paper-plane"></i> Warehouse သို့ ပေးပို့မည်` : `<i class="fa-solid fa-arrow-up-from-bracket"></i> စာရင်း အထွက်သွင်းမည်`;
+    btn.innerHTML = (userRole === "CLIENT") 
+      ? `<i class="fa-solid fa-paper-plane"></i> Warehouse သို့ ပေးပို့မည်` 
+      : `<i class="fa-solid fa-circle-check"></i> စာရင်း တိုက်ရိုက် သွင်းမည်`;
   }
 });
 
